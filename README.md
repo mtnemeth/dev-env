@@ -17,7 +17,7 @@ This is a WSL+Ubuntu based developer environment for Windows. Includes tools suc
 
 [Install WSL](./wsl-ubuntu/README.md)
 
-## Install developer tools
+### Install developer tools
 
 Install tools on the new WSL distro.
 
