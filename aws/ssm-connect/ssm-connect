@@ -1,0 +1,110 @@
+#!/usr/bin/env bash
+
+# Tool that helps connecting to EC2 instances with AWS SSM
+
+echo_err() {
+  echo "$@" >&2
+}
+
+get_instance_id_user_select() {
+  # get SSM instances
+  ssm_instance_info=$( \
+    aws ssm describe-instance-information \
+    --query 'InstanceInformationList[].InstanceId' \
+  )
+  # check if there is any
+  if [[ $(printf '%s\n' "${ssm_instance_info}" | jq length) -eq 0 ]]; then
+    echo_err "No instances with SSM found!"
+    exit 1
+  fi
+  # construct instance_id list
+  ssm_instance_ids=$( \
+    printf '%s\n' "${ssm_instance_info}" | jq -r '.[]' | paste -s -d' ' \
+  )
+  # get name tags
+  readarray -t instance_array < <( \
+    aws ec2 describe-instances \
+    --instance-ids ${ssm_instance_ids} \
+    --query 'Reservations[*].Instances[*].{Instance:InstanceId,Name:Tags[?Key==`Name`]|[0].Value}' \
+    | jq -r '.[] | .[] | .Instance, .Name' \
+  )
+
+  if [ ${#instance_array[@]} -eq 0 ]; then
+    echo_err "No instances found. Exiting."
+    exit 1
+  fi
+
+  # echo_err "--------------------"
+  # for i in "${instance_array[@]}"; do echo_err $i; done
+  # echo_err "--------------------"
+
+  instance_id=$(\
+    whiptail \
+      --title "AWS SSM connect" \
+      --menu "Select an EC2" 20 60 10 \
+      "${instance_array[@]}" 3>&1 1>&2 2>&3 \
+  )
+
+  if [ -z "$instance_id" ]; then
+    echo_err "Did not select. Exiting."
+    return
+  fi
+
+  echo_err "Selected instance id: ${instance_id}."
+  echo_err "----------------------------"
+  echo_err "# to connect manyally, copy-paste:"
+  echo_err "export iid=${instance_id}"
+  echo_err 'aws ssm start-session --target "${iid}"'
+  echo_err "----------------------------"
+  
+  echo "${instance_id}"
+}
+
+get_instance_id_by_name_tag() {
+  instance_id=$(\
+    aws ec2 describe-instances \
+    --filters "Name=tag:Name,Values=${1}" \
+    --query "Reservations[].Instances[].InstanceId" --output text | tr -d '\r' \
+  )
+
+  echo "${instance_id}"
+}
+
+connect_instance() {
+  echo_err "Connecting with AWS SSM..."
+
+  aws ssm start-session --target "${instance_id}"
+}
+
+# Verify AWS_PROFILE is set and user is logged in.
+
+if [ -z ${AWS_PROFILE+x} ]; then
+  echo_err "AWS_PROFILE is unset. Run 'export AWS_PROFILE=profile_name' to set it."
+  exit 1
+fi
+
+aws sts get-caller-identity 1>&2
+ret_code=$?
+
+if [ $ret_code -ne 0 ]; then
+  echo_err "Not logged in to AWS. Use 'aws sso login' to login."
+  exit 1
+fi
+
+# Main
+
+if [ $# -eq 0 ]
+  then
+    instance_id=$(get_instance_id_user_select)
+    if [ -z ${instance_id} ]; then
+      exit 1
+    fi
+  else
+    instance_id=$(get_instance_id_by_name_tag "$1")
+    if [ -z ${instance_id} ]; then
+      echo_err "No instances found with name tag: ${1}. Exiting."
+      exit 1
+    fi
+fi
+
+connect_instance "${instance_id}"

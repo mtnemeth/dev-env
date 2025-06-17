@@ -1,0 +1,64 @@
+- name: Download SnowSQL installer
+  ansible.builtin.get_url:
+    url: "{{ snowsql_snowflake_bin_download_url }}"
+    dest: "{{ temp_dir }}/snowsql.bash"
+    mode: '0644'
+
+- name: Download SnowSQL sig
+  ansible.builtin.get_url:
+    url: "{{ snowsql_snowflake_sig_download_url }}"
+    dest: "{{ temp_dir }}/snowsql.bash.sig"
+    mode: '0644'
+  register: snowsql_download
+
+- name: Create ~/bin
+  ansible.builtin.file:
+    path: "/home/{{ ansible_user_id }}/bin"
+    state: directory
+    mode: '0755'
+
+- name: Setup Snowflake GPG keys
+  ansible.builtin.command:
+    cmd: gpg --keyserver hkp://keyserver.ubuntu.com --recv-keys {{ snowsql_snowflake_gpg_keys }}
+  register: snow_gpg_key_import_result
+  changed_when: '"imported" in snow_gpg_key_import_result.stdout'
+
+- name: Verify installer
+  ansible.builtin.command:
+    cmd: gpg --verify "{{ temp_dir }}/snowsql.bash.sig" "{{ temp_dir }}/snowsql.bash"
+  changed_when: true
+
+- name: Delete GPG keys
+  ansible.builtin.shell:
+    cmd: while gpg --batch --yes --delete-keys "Snowflake"; do :; done
+  changed_when: true
+
+- name: Run Bash installer # noqa: command-instead-of-shell
+  ansible.builtin.shell:
+    cmd: SNOWSQL_DEST="/home/{{ ansible_user_id }}/bin" SNOWSQL_LOGIN_SHELL="/home/{{ ansible_user_id }}/.profile" bash "{{ temp_dir }}/snowsql.bash"
+    creates: "/home/{{ ansible_user_id }}/bin/snowsql"
+
+- name: Default config for SnowSql
+  ansible.builtin.template:
+    src: snowsql/config
+    dest: "/home/{{ ansible_user_id }}/.snowsql/config"
+    mode: '0644'
+
+- name: Install Snowflake CLI
+  ansible.builtin.apt:
+    deb: "{{ snowflake_cli_url }}"
+    state: present
+    update_cache: false
+  become: true
+
+- name: Create directory '~/.snowflake'
+  ansible.builtin.file:
+    path: "/home/{{ ansible_user_id }}/.snowflake"
+    state: directory
+    mode: '0700'
+
+- name: Default config for Snowflake CLI
+  ansible.builtin.template:
+    src: snowflake/config.toml
+    dest: "/home/{{ ansible_user_id }}/.snowflake/config.toml"
+    mode: '0600'

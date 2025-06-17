@@ -1,0 +1,15 @@
+- name: Basic config for Git
+  ansible.builtin.shell: # noqa: command-instead-of-module
+    cmd: |
+      git config --global user.email "{{ email_address }}"
+      git config --global user.name "{{ user_name }}"
+      git config --global core.autocrlf input
+      git config --global core.eol lf
+  changed_when: true
+
+- name: Git credential helper config in WSL
+  ansible.builtin.shell: # noqa: command-instead-of-module
+    cmd: |
+      git config --global credential.helper "{{ git_credential_helper_path }}"
+  when: "'WSL' in ansible_kernel"
+  changed_when: true

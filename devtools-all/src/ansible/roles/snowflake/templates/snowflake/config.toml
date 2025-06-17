@@ -1,0 +1,11 @@
+[cli.logs]
+save_logs = true
+level = "warning"
+path = "/home/{{ ansible_user_id }}/.snowflake/logs"
+
+[connections]
+# [connections.org-account]
+# account = "org-account"
+# authenticator = "externalbrowser"
+# user = "user"
+# role = "TEST_ROLE"

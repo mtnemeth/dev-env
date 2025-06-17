@@ -1,0 +1,21 @@
+- name: Create ~/.bashrc.d
+  ansible.builtin.file:
+    path: /home/{{ ansible_user_id }}/.bashrc.d
+    state: directory
+    mode: '0700'
+
+- name: Copy browser.sh
+  ansible.builtin.template:
+    src: browser.sh
+    dest: "/home/{{ ansible_user_id }}/.bashrc.d/"
+    mode: '0600'
+
+- name: Update .bashrc
+  ansible.builtin.blockinfile:
+    path: "/home/{{ ansible_user_id }}/.bashrc"
+    append_newline: true
+    prepend_newline: true
+    block: |
+      for file in ~/.bashrc.d/*.sh; do
+        source "${file}"
+      done

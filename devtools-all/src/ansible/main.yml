@@ -1,0 +1,13 @@
+---
+- name: Dev Tools Setup
+  hosts: localhost
+  roles:
+    - env
+    - os_packages
+    - awscliv2
+    - snowflake
+    - hashicorp
+    - node
+    - mysql
+    - git
+  gather_facts: true

@@ -1,0 +1,28 @@
+- name: Add HashiCorp GPG key
+  ansible.builtin.shell:
+    cmd: |
+      set -o pipefail
+      wget -O- https://apt.releases.hashicorp.com/gpg | \
+      gpg --dearmor > /usr/share/keyrings/hashicorp-archive-keyring.gpg
+    executable: /bin/bash
+    creates: /usr/share/keyrings/hashicorp-archive-keyring.gpg
+  become: true
+
+- name: Add HashiCorp apt repo
+  ansible.builtin.apt_repository:
+    repo: "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com {{ ansible_distribution_release }} main"
+    state: present
+  become: true
+
+- name: Install Terraform
+  ansible.builtin.apt:
+    name: terraform
+    state: present
+    update_cache: true
+  become: true
+
+- name: Install packer
+  ansible.builtin.apt:
+    name: packer
+    state: present
+  become: true

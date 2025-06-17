@@ -1,0 +1,8 @@
+[options]
+log_file=/home/{{ ansible_user_id }}/.snowsql/log
+
+# [connections.org-account]
+# accountname = org-account
+# username = username
+# authenticator = externalbrowser
+# rolename = ACCOUNTADMIN

@@ -1,0 +1,80 @@
+---
+
+- name: Download AWS CLI v2 installer
+  ansible.builtin.unarchive:
+    src: https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip
+    dest: "{{ temp_dir }}"
+    remote_src: true
+    creates: "{{ temp_dir }}/aws"
+    mode: '0755'
+
+- name: Run the AWS CLI installer
+  ansible.builtin.command:
+    cmd: "{{ temp_dir }}/aws/install"
+    creates: /usr/local/bin/aws
+  become: true
+  register: aws_install
+
+- name: Show AWS CLI installer output
+  ansible.builtin.debug:
+    var: aws_install
+    verbosity: 1
+
+- name: Download SSM Plugin for AWS CLI
+  ansible.builtin.get_url:
+    url: "https://s3.amazonaws.com/session-manager-downloads/plugin/latest/ubuntu_64bit/session-manager-plugin.deb"
+    dest: "{{ temp_dir }}/session-manager-plugin.deb"
+    mode: '0644'
+
+- name: Install SSM Plugin for AWS CLI
+  ansible.builtin.apt:
+    deb: "{{ temp_dir }}/session-manager-plugin.deb"
+  become: true
+
+- name: Download SAM CLI
+  ansible.builtin.get_url:
+    url: "https://github.com/aws/aws-sam-cli/releases/latest/download/aws-sam-cli-linux-x86_64.zip"
+    dest: "{{ temp_dir }}/aws-sam-cli-linux-x86_64.zip"
+    mode: '0644'
+
+- name: Create Temp Direcory for SAM CLI installer
+  ansible.builtin.file:
+    path: "{{ temp_dir }}/sam-install"
+    state: directory
+    mode: '0755'
+
+- name: Unzip SAM CLI
+  ansible.builtin.unarchive:
+    src: "{{ temp_dir }}/aws-sam-cli-linux-x86_64.zip"
+    dest: "{{ temp_dir }}/sam-install"
+    creates: "{{ temp_dir }}/sam-install/install"
+
+- name: Install SAM CLI
+  ansible.builtin.command:
+    cmd: "{{ temp_dir }}/sam-install/install"
+    creates: "/usr/local/bin/sam"
+  become: true
+
+- name: On WSL, if %USERPROFILE%/.aws exists, symlink to ~/.aws, create directory otherwise
+  ansible.builtin.shell:
+    cmd: |
+      if [ -d $(wslpath -u $(wslvar USERPROFILE))/.aws ]; then
+        ln -s $(wslpath -u $(wslvar USERPROFILE))/.aws /home/{{ ansible_user_id }}/.aws
+      else
+        mkdir -p /home/{{ ansible_user_id }}/.aws
+      fi
+    creates: /home/{{ ansible_user_id }}/.aws
+  when: "'WSL' in ansible_kernel"
+
+# - name: Setup AWS completion. Copy aws_complete.sh
+#   ansible.builtin.copy:
+#     src: aws_complete.sh
+#     dest: "/home/{{ ansible_user_id }}/.bashrc.d/"
+#     mode: '0600'
+
+- name: Install ssm-connect
+  ansible.builtin.copy:
+    src: ../../../../../../aws/ssm-connect/ssm-connect
+    dest: /usr/local/bin/
+    mode: '0755'
+  become: true
