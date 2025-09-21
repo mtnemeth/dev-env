@@ -8,6 +8,8 @@ If WSL not yet installed:
 
 ```PS1
 wsl --install
+
+# Restart Windows
 ```
 
 If installed, update:
