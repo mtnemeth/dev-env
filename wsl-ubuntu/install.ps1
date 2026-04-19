@@ -30,7 +30,7 @@
 
 param (
     [string]$TempDir="$env:TEMP\wsl-installer-script-temp",
-    [string]$WslDistroInstallPath="C:\dev\wsl\",
+    [string]$WslDistroInstallPath="$env:USERPROFILE\dev\wsl\",
     [string]$DistroName="dev-tools",
     [switch]$Cached=$false,
     [switch]$NotEnableSystemD=$false,
