@@ -19,3 +19,15 @@
       for file in ~/.bashrc.d/*.sh; do
         source "${file}"
       done
+
+- name: Create ~/bin
+  ansible.builtin.file:
+    path: /home/{{ ansible_user_id }}/bin
+    state: directory
+    mode: '0700'
+
+- name: Copy browser-incognito.sh
+  ansible.builtin.copy:
+    src: browser-incognito.sh
+    dest: "/home/{{ ansible_user_id }}/bin/"
+    mode: '0700'
