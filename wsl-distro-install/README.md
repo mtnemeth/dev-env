@@ -1,4 +1,4 @@
-# Install WSL Ubuntu distro for development
+# Install WSL Linux distro for development
 
 ## Pre-requisites: install WSL and enable PS script execution
 
@@ -35,7 +35,7 @@ Get-Help .\install.ps1 -Full
 Run installer:
 
 ```PS1
-.\install.ps1 -DistroName dev-tools -InstallDocker
+.\install.ps1 -WslDistroName dev-tools -InstallDocker -InstallDevTools
 ```
 
 ## Start the distro

@@ -56,4 +56,4 @@
     state: present
     update_cache: false
   become: true
-  when: "'WSL' in ansible_kernel"
+  when: "'WSL' in ansible_kernel and ansible_distribution == 'Ubuntu'"

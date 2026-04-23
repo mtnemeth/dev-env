@@ -1,9 +1,9 @@
 <#
     .SYNOPSIS
-    Installs an Ubuntu WSL Distro for dev work.
+    Installs a WSL Linux Distro for dev work.
 
     .DESCRIPTION
-    Installs an Ubuntu WSL Distro for dev work.
+    Installs a WSL Linux Distro for dev work.
 
     .PARAMETER TempDir
     Temporary directory used during the installation.
@@ -11,8 +11,11 @@
     .PARAMETER WslDistroInstallPath
     Installation directory for the WSL Distro.
 
-    .PARAMETER DistroName
-    Name of the WSL Distro. You will run the distro with 'wsl -d <DistroName>'.
+    .PARAMETER WslDistroName
+    Name of the WSL Distro. You will run the distro with 'wsl -d <WslDistroName>'.
+
+    .PARAMETER LinuxDistro
+    The Linux distribution to install. Valid values are 'debian' and 'ubuntu'.
 
     .PARAMETER Cached
     Re-uses previously downloaded image file in the temporary folder.
@@ -23,23 +26,28 @@
     .PARAMETER InstallDocker
     Installs the Docker engine into the WSL Distro.
 
+    .PARAMETER InstallDevTools
+    Installs development tools into the WSL Distro.
+
     .EXAMPLE
-    PS> .\install.ps1 -DistroName dev-tools -InstallDocker
+    PS> .\install.ps1 -WslDistroName dev-tools -InstallDocker -InstallDevTools
 
 #>
 
 param (
     [string]$TempDir="$env:TEMP\wsl-installer-script-temp",
     [string]$WslDistroInstallPath="$env:USERPROFILE\dev\wsl\",
-    [string]$DistroName="dev-tools",
+    [string]$WslDistroName="dev-tools",
+    [string][ValidateSet('debian','ubuntu') ]$LinuxDistro="debian",
     [switch]$Cached=$false,
     [switch]$NotEnableSystemD=$false,
-    [switch]$InstallDocker=$false
+    [switch]$InstallDocker=$false,
+    [switch]$InstallDevTools=$false
 )
 
 $ErrorActionPreference = "Stop"
 
-$InstallDir=Join-Path -Path "$WslDistroInstallPath" -ChildPath "$DistroName"
+$InstallDir=Join-Path -Path "$WslDistroInstallPath" -ChildPath "$WslDistroName"
 
 if ($InstallDocker) {$NotEnableSystemD=$false}
 
@@ -47,7 +55,7 @@ Write-Output "----------------------------------------"
 Write-Output "Parameters:"
 Write-Output "  TempDir         : $TempDir"
 Write-Output "  InstallDir      : $InstallDir"
-Write-Output "  DistroName      : $DistroName"
+Write-Output "  WslDistroName   : $WslDistroName"
 Write-Output "  Cached          : $Cached"
 Write-Output "  Enable SystemD  : $(!$NotEnableSystemD)"
 Write-Output "  Install Docker  : $InstallDocker"
@@ -59,11 +67,11 @@ function Install-Distro {
     $WslPwd="eng"
 
     Write-Output "Check if distro already installed."
-    $distroInstalled = (wsl -l | Where-Object {$_.Replace("`0","") -match $DistroName}) -replace '\x00',''
-    if ($distroInstalled -match "$([regex]::escape($DistroName)).*") {
+    $distroInstalled = (wsl -l | Where-Object {$_.Replace("`0","") -match $WslDistroName}) -replace '\x00',''
+    if ($distroInstalled -match "$([regex]::escape($WslDistroName)).*") {
         Write-Output "Distro is already installed. If you continue, the distro will be removed first and then re-installed."
         $choices = [System.Management.Automation.Host.ChoiceDescription[]]@('&Yes', '&No')
-        $decision = $Host.UI.PromptForChoice("Confirm '$DistroName' distro re-install", 'Are you sure you want to proceed?', $choices, 1)
+        $decision = $Host.UI.PromptForChoice("Confirm '$WslDistroName' distro re-install", 'Are you sure you want to proceed?', $choices, 1)
         if ($decision -eq 0) {
             Write-Host 'Confirmed'
         } else {
@@ -71,9 +79,9 @@ function Install-Distro {
             exit
         }
         Write-Output "Removing existing distro."
-        wsl --terminate $DistroName
+        wsl --terminate $WslDistroName
         if (!$?) { throw "WSL terminate failed" }
-        wsl --unregister $DistroName
+        wsl --unregister $WslDistroName
         if (!$?) { throw "WSL unregister failed" }
     } else {
         Write-Output "Distro not installed."
@@ -100,7 +108,7 @@ function Install-Distro {
     }
     New-Item -Path $InstallDir -ItemType Directory | Out-Null
 
-    $destFile = "$TempDir\ubuntu.wsl"
+    $destFile = "$TempDir\linux-dev-tools.wsl"
 
     if (!($Cached)) {
         Write-Output "Download Linux root file system image for WSL."
@@ -110,7 +118,12 @@ function Install-Distro {
         Do {
             Write-Output "> Attempt $attemptCount"
             $attemptCount++
-            $wc.Downloadfile("https://cdimages.ubuntu.com/ubuntu-wsl/noble/daily-live/current/noble-wsl-amd64.wsl", $destFile)
+            if ($LinuxDistro -eq "ubuntu") {
+                $rootfsUrl = "https://cdimages.ubuntu.com/ubuntu-wsl/noble/daily-live/current/noble-wsl-amd64.wsl"
+            } elseif ($LinuxDistro -eq "debian") {
+                $rootfsUrl = "https://salsa.debian.org/debian/WSL/-/raw/master/x64/install.tar.gz"
+            }
+            $wc.Downloadfile($rootfsUrl, $destFile)
         } while (((Test-Path $destFile) -eq $false) -and ($attemptCount -le $maxAttempts))
         if (!(Test-Path $destFile)) {
             throw "Failed to download root file system image."
@@ -118,34 +131,35 @@ function Install-Distro {
     }
 
     Write-Output "Create new WSL distro for Dev Tools by importing the root file system image."
-    wsl --import $DistroName $InstallDir $destFile --version 2
+    wsl --import $WslDistroName $InstallDir $destFile --version 2
     if (!$?) { throw "WSL import failed" }
 
-    Write-Output "Distro name: ($DistroName)"
+    Write-Output "Distro name: ($WslDistroName)"
 
     Write-Output "Running initial distro setups: create and set non-root default user, etc."
-    wsl -d $DistroName -e ./src/initial-distro-setups.sh "$WslGroup" "$WslUser" "$WslPwd"
+    wsl -d $WslDistroName -e ./src/initial-distro-setups.sh "$WslGroup" "$WslUser" "$WslPwd"
     if (!$?) { throw "WSL distro initial setups failed" }
 
     if (!$NotEnableSystemD) {
-        wsl -d $DistroName -e "./src/enable-systemd.sh"
+        wsl -d $WslDistroName -e "./src/enable-systemd.sh"
     }
 
     Write-Output "Terminating the distro to force restart."
-    wsl --terminate $DistroName
+    wsl --terminate $WslDistroName
     if (!$?) { throw "WSL distro terminate failed" }
-
-    Write-Output "Running pre-requisites setups"
-    wsl -d $DistroName -e ./src/install-prerequisites.sh
-    if (!$?) { throw "Pre-req setup failed" }
 
     if ($InstallDocker) {
         Write-Output "Running Docker engine setup"
-        wsl -d $DistroName -e ./src/install-docker.sh
+        wsl -d $WslDistroName -e ./src/install-docker.sh
+    }
+
+    if ($InstallDevTools) {
+        Write-Output "Running Dev Tools setup"
+        wsl -d $WslDistroName -e ../devtools-all/install.sh
     }
 
     Write-Output "Terminating the distro to force restart."
-    wsl --terminate $DistroName
+    wsl --terminate $WslDistroName
     if (!$?) { throw "WSL distro terminate failed" }
 
     Write-Output "Create desktop shortcut for Dev Tools"
@@ -154,7 +168,7 @@ function Install-Distro {
     $shell = New-Object -ComObject WScript.Shell
     $shortcut = $shell.CreateShortcut($target_path)
     $shortcut.TargetPath = "wsl.exe"
-    $shortcut.Arguments = "-d $DistroName"
+    $shortcut.Arguments = "-d $WslDistroName"
     $shortcut.Save()
 
     Write-Output "Install complete."

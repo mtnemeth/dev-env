@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -e
 
 script_root="$( cd "$( dirname "$0" )" >/dev/null 2>&1 && pwd )"
 
@@ -17,8 +18,13 @@ echo "Email:    ${dt_email}"
 
 echo "Making sure pre-requisites are installed..."
 
-sudo apt install --yes --no-install-recommends software-properties-common ansible
+export DEBIAN_FRONTEND=noninteractive
+
+sudo apt-get update --yes
+
+sudo apt install --yes --no-install-recommends ansible #software-properties-common
 ansible-galaxy collection install amazon.aws
+
 
 echo "Running Ansible playbook..."
 
