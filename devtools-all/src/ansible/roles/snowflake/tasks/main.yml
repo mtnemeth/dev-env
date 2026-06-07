@@ -18,10 +18,20 @@
     mode: '0755'
 
 - name: Setup Snowflake GPG keys
-  ansible.builtin.command:
-    cmd: gpg --keyserver hkp://keyserver.ubuntu.com --recv-keys {{ snowsql_snowflake_gpg_keys }}
-  register: snow_gpg_key_import_result
-  changed_when: '"imported" in snow_gpg_key_import_result.stdout'
+  block:
+    - name: Import Snowflake GPG keys from Ubuntu keyserver
+      ansible.builtin.command:
+        cmd: |
+          set -o pipefail
+          gpg --keyserver hkp://keyserver.ubuntu.com --recv-keys {{ snowsql_snowflake_gpg_keys }}
+      register: snow_gpg_key_import_result
+      changed_when: '"imported" in snow_gpg_key_import_result.stdout'
+  rescue:
+    - name: Import Snowflake GPG keys using curl
+      ansible.builtin.shell:
+        cmd: curl 'http://keyserver.ubuntu.com/pks/lookup?op=get&search=0x{{ snowsql_snowflake_gpg_keys }}' | gpg --import
+      register: snow_gpg_key_import_result
+      changed_when: '"imported" in snow_gpg_key_import_result.stdout'
 
 - name: Verify installer
   ansible.builtin.command:
